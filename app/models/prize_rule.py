@@ -1,6 +1,13 @@
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String
+from sqlalchemy import (
+    Boolean,
+    DateTime,
+    ForeignKey,
+    Integer,
+    String,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import Mapped, mapped_column,relationship
 from typing import TYPE_CHECKING
 
@@ -10,6 +17,13 @@ if TYPE_CHECKING:
 
 class PrizeRule(Base):
     __tablename__ = "prize_rules"
+    __table_args__ = (
+    UniqueConstraint(
+        "game_config_id",
+        "required_wins",
+        name="uq_prize_rule_config_wins",
+    ),
+)
 
     id: Mapped[int] = mapped_column(
         Integer,

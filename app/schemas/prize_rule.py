@@ -3,8 +3,8 @@ from pydantic import BaseModel, Field
 
 class PrizeRuleBase(BaseModel):
     required_wins: int = Field(
-        ge=0,
-        description="Number of player wins required to receive this prize.",
+        ge=1,
+        description="Number of wins required to receive this prize.",
     )
 
     prize_name: str = Field(
@@ -31,4 +31,3 @@ class PrizeRuleResponse(PrizeRuleBase):
     model_config = {
         "from_attributes": True,
     }
-    
