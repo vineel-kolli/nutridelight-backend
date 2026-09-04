@@ -1,10 +1,12 @@
 from datetime import datetime
 
 from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column,relationship
+from typing import TYPE_CHECKING
 
 from app.core.database import Base
-
+if TYPE_CHECKING:
+    from app.models.game_config import GameConfig
 
 class PrizeRule(Base):
     __tablename__ = "prize_rules"
@@ -53,3 +55,9 @@ class PrizeRule(Base):
         onupdate=datetime.utcnow,
     )
     
+
+    game_config: Mapped["GameConfig"] = relationship(
+        "GameConfig",
+        back_populates="prizes",
+)
+

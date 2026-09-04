@@ -10,8 +10,6 @@ class GameConfigBase(BaseModel):
         description="Number of games in one match.",
     )
 
-    is_active: bool = True
-
 
 class GameConfigCreate(GameConfigBase):
     pass
