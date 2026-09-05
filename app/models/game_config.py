@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime,UTC
 
 from sqlalchemy import Boolean, DateTime, Integer
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -28,14 +28,14 @@ class GameConfig(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime,
         nullable=False,
-        default=datetime.utcnow,
+        default=lambda: datetime.now(UTC),
     )
 
     updated_at: Mapped[datetime] = mapped_column(
         DateTime,
         nullable=False,
-        default=datetime.utcnow,
-        onupdate=datetime.utcnow,
+        default=lambda: datetime.now(UTC),
+        onupdate=lambda: datetime.now(UTC),
     )
 
     prizes: Mapped[list["PrizeRule"]] = relationship(

@@ -7,6 +7,7 @@ class Settings(BaseSettings):
     environment: str = "development"
 
     database_url: str
+    frontend_url: str = "http://localhost:5173"
 
     model_config = SettingsConfigDict(
         env_file=".env",
