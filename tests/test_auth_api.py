@@ -294,11 +294,14 @@ def login_test_admin() -> None:
 
 def test_update_game_config_requires_authentication():
     response = client.put(
-        "/api/v1/game-config",
-        json={
-            "total_games": 5,
-        },
-    )
+    "/api/v1/game-config",
+    headers={
+        "Origin": "http://localhost:5173",
+    },
+    json={
+        "total_games": 5,
+    },
+)
 
     assert response.status_code == 401
     assert response.json()["detail"] == "Authentication required"
@@ -310,11 +313,14 @@ def test_update_game_config_allows_authenticated_admin():
     login_test_admin()
 
     response = client.put(
-        "/api/v1/game-config",
-        json={
-            "total_games": 5,
-        },
-    )
+    "/api/v1/game-config",
+    headers={
+        "Origin": "http://localhost:5173",
+    },
+    json={
+        "total_games": 5,
+    },
+)
 
     assert response.status_code == 200
     assert response.json()["total_games"] == 5
@@ -339,8 +345,11 @@ def test_create_prize_rule_requires_authentication():
         db.close()
 
     response = client.post(
-        f"/api/v1/game-config/{game_config_id}/prize-rules",
-        json={
+    f"/api/v1/game-config/{game_config_id}/prize-rules",
+    headers={
+        "Origin": "http://localhost:5173",
+    },
+    json={
             "required_wins": 5,
             "prize_name": "30% Discount",
             "prize_image_url": "https://example.com/prize.png",
@@ -375,8 +384,11 @@ def test_create_prize_rule_allows_authenticated_admin():
     login_test_admin()
 
     response = client.post(
-        f"/api/v1/game-config/{game_config_id}/prize-rules",
-        json={
+    f"/api/v1/game-config/{game_config_id}/prize-rules",
+    headers={
+        "Origin": "http://localhost:5173",
+    },
+    json={
             "required_wins": 5,
             "prize_name": "30% Discount",
             "prize_image_url": "https://example.com/prize.png",
@@ -425,8 +437,11 @@ def test_update_prize_rule_requires_authentication():
         db.close()
 
     response = client.put(
-        f"/api/v1/game-config/{game_config_id}/prize-rules/{prize_rule_id}",
-        json={
+    f"/api/v1/game-config/{game_config_id}/prize-rules/{prize_rule_id}",
+    headers={
+        "Origin": "http://localhost:5173",
+    },
+    json={
             "required_wins": 5,
             "prize_name": "Updated Discount",
             "prize_image_url": "https://example.com/updated.png",
@@ -474,8 +489,11 @@ def test_update_prize_rule_allows_authenticated_admin():
     login_test_admin()
 
     response = client.put(
-        f"/api/v1/game-config/{game_config_id}/prize-rules/{prize_rule_id}",
-        json={
+    f"/api/v1/game-config/{game_config_id}/prize-rules/{prize_rule_id}",
+    headers={
+        "Origin": "http://localhost:5173",
+    },
+    json={
             "required_wins": 5,
             "prize_name": "Updated Discount",
             "prize_image_url": "https://example.com/updated.png",
@@ -541,3 +559,149 @@ def test_public_match_completion_does_not_require_admin_auth():
     assert response.status_code == 200
     assert response.json()["player_wins"] == 3
     assert response.json()["buddy_wins"] == 2
+
+
+def login_test_admin() -> None:
+    response = client.post(
+        "/api/v1/admin/auth/login",
+        json={
+            "username": "testadmin",
+            "password": "TestPassword123!",
+        },
+    )
+
+    assert response.status_code == 200
+
+
+def test_update_game_config_rejects_wrong_origin():
+    create_test_admin()
+
+    login_test_admin()
+
+    response = client.put(
+        "/api/v1/game-config",
+        headers={
+            "Origin": "http://evil.example",
+        },
+        json={
+            "total_games": 5,
+        },
+    )
+
+    assert response.status_code == 403
+    assert response.json()["detail"] == "Invalid request origin"
+
+def test_update_game_config_rejects_missing_origin():
+    create_test_admin()
+
+    login_test_admin()
+
+    response = client.put(
+        "/api/v1/game-config",
+        json={
+            "total_games": 5,
+        },
+    )
+
+    assert response.status_code == 403
+    assert response.json()["detail"] == "Invalid request origin"
+
+
+
+def test_create_prize_rule_rejects_wrong_origin():
+    create_test_admin()
+
+    db = SessionLocal()
+
+    try:
+        game_config = GameConfig(
+            total_games=5,
+            is_active=True,
+        )
+
+        db.add(game_config)
+        db.commit()
+        db.refresh(game_config)
+
+        game_config_id = game_config.id
+
+    finally:
+        db.close()
+
+    login_test_admin()
+
+    response = client.post(
+        f"/api/v1/game-config/{game_config_id}/prize-rules",
+        headers={
+            "Origin": "http://evil.example",
+        },
+        json={
+            "required_wins": 5,
+            "prize_name": "30% Discount",
+            "prize_image_url": "https://example.com/prize.png",
+            "is_active": True,
+        },
+    )
+
+    assert response.status_code == 403
+    assert response.json()["detail"] == "Invalid request origin"
+
+
+
+def test_update_prize_rule_rejects_wrong_origin():
+    create_test_admin()
+
+    db = SessionLocal()
+
+    try:
+        game_config = GameConfig(
+            total_games=5,
+            is_active=True,
+        )
+
+        db.add(game_config)
+        db.flush()
+
+        prize_rule = PrizeRule(
+            game_config_id=game_config.id,
+            required_wins=5,
+            prize_name="30% Discount",
+            prize_image_url="https://example.com/prize.png",
+            is_active=True,
+        )
+
+        db.add(prize_rule)
+        db.commit()
+        db.refresh(prize_rule)
+
+        game_config_id = game_config.id
+        prize_rule_id = prize_rule.id
+
+    finally:
+        db.close()
+
+    login_test_admin()
+
+    response = client.put(
+        f"/api/v1/game-config/{game_config_id}/prize-rules/{prize_rule_id}",
+        headers={
+            "Origin": "http://evil.example",
+        },
+        json={
+            "required_wins": 5,
+            "prize_name": "Updated Discount",
+            "prize_image_url": "https://example.com/updated.png",
+            "is_active": True,
+        },
+    )
+
+    assert response.status_code == 403
+    assert response.json()["detail"] == "Invalid request origin"
+
+
+def test_get_prize_rules_requires_auth():
+    response = client.get(
+        "/api/v1/game-config/1/prize-rules"
+    )
+
+    assert response.status_code == 401

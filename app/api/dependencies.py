@@ -1,16 +1,29 @@
 from collections.abc import Generator
 
-from fastapi import Cookie, Depends, HTTPException, status
+from fastapi import (
+    Cookie,
+    Depends,
+    Header,
+    HTTPException,
+    status,
+)
 from sqlalchemy.orm import Session
 
 from app.core.database import SessionLocal
 from app.models.admin_user import AdminUser
 from app.services.auth_service import get_admin_by_session
-
+from app.core.config import settings
 
 ADMIN_SESSION_COOKIE = "nutri_admin_session"
 
-
+def require_admin_origin(
+    origin: str | None = Header(default=None),
+) -> None:
+    if origin != settings.frontend_url:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Invalid request origin",
+        )
 def get_db() -> Generator[Session, None, None]:
     db = SessionLocal()
 

@@ -2,12 +2,11 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models.game_config import GameConfig
+from app.models.prize_rule import PrizeRule
 from app.schemas.game_config import GameConfigCreate
 
 
-def get_active_game_config(
-    db: Session,
-) -> GameConfig | None:
+def get_active_game_config(db: Session) -> GameConfig | None:
     statement = (
         select(GameConfig)
         .where(GameConfig.is_active.is_(True))
@@ -33,15 +32,32 @@ def update_game_config(
 
     if game_config is None:
         game_config = GameConfig(
-            id=1,
             total_games=data.total_games,
             is_active=True,
         )
 
         db.add(game_config)
-    else:
-        game_config.total_games = data.total_games
-        game_config.is_active = True
+        db.commit()
+        db.refresh(game_config)
+
+        return game_config
+
+    invalid_rule_statement = select(PrizeRule).where(
+        PrizeRule.game_config_id == game_config.id,
+        PrizeRule.required_wins > data.total_games,
+    )
+
+    invalid_rule = db.execute(
+        invalid_rule_statement
+    ).scalar_one_or_none()
+
+    if invalid_rule is not None:
+        raise ValueError(
+            "Total games cannot be lower than an existing prize rule's required wins"
+        )
+
+    game_config.total_games = data.total_games
+    game_config.is_active = True
 
     db.commit()
     db.refresh(game_config)

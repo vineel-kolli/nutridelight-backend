@@ -1,7 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+from app.models.admin_user import AdminUser
 
-from app.api.dependencies import get_db,get_current_admin
+from app.api.dependencies import (
+    get_current_admin,
+    get_db,
+    require_admin_origin,
+)
 from app.schemas.game_config import (
     GameConfigCreate,
     GameConfigResponse,
@@ -43,6 +48,7 @@ def get_game_config(
 def update_game_config_endpoint(
     data: GameConfigCreate,
     db: Session = Depends(get_db),
-    admin=Depends(get_current_admin),
+    admin: AdminUser = Depends(get_current_admin),
+    _: None = Depends(require_admin_origin),
 ):
     return update_game_config(db, data)

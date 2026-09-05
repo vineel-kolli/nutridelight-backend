@@ -5,6 +5,7 @@ from app.api.dependencies import (
     ADMIN_SESSION_COOKIE,
     get_current_admin,
     get_db,
+    require_admin_origin,
 )
 from app.models.admin_user import AdminUser
 from app.schemas.auth import (
@@ -34,6 +35,7 @@ def login(
     data: AdminLoginRequest,
     response: Response,
     db: Session = Depends(get_db),
+   
 ):
     admin = authenticate_admin(
         db=db,
@@ -81,6 +83,7 @@ def logout(
     ),
     db: Session = Depends(get_db),
     admin: AdminUser = Depends(get_current_admin),
+   
 ):
     if admin_session:
         revoke_admin_session(

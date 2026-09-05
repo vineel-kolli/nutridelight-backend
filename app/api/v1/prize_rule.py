@@ -1,7 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from app.api.dependencies import get_db,get_current_admin
+from app.api.dependencies import (
+    get_current_admin,
+    get_db,
+    require_admin_origin,
+)
 from app.schemas.prize_rule import (
     PrizeRuleCreate,
     PrizeRuleResponse,
@@ -9,6 +13,7 @@ from app.schemas.prize_rule import (
 from app.services.prize_rule_service import (
     create_prize_rule,
     update_prize_rule,
+    get_prize_rules,
 )
 
 
@@ -16,7 +21,25 @@ router = APIRouter(
     prefix="/game-config/{game_config_id}/prize-rules",
     tags=["Prize Rules"],
 )
-
+@router.get(
+    "",
+    response_model=list[PrizeRuleResponse],
+)
+def get_prize_rules_endpoint(
+    game_config_id: int,
+    db: Session = Depends(get_db),
+    admin=Depends(get_current_admin),
+):
+    try:
+        return get_prize_rules(
+            db,
+            game_config_id,
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=404,
+            detail=str(exc),
+        ) from exc
 
 @router.post(
     "",
@@ -28,6 +51,7 @@ def create_prize_rule_endpoint(
     data: PrizeRuleCreate,
     db: Session = Depends(get_db),
     admin=Depends(get_current_admin),
+    _: None = Depends(require_admin_origin),
 ):
     try:
         return create_prize_rule(
@@ -52,7 +76,7 @@ def update_prize_rule_endpoint(
     data: PrizeRuleCreate,
     db: Session = Depends(get_db),
     admin=Depends(get_current_admin),
-
+    _: None = Depends(require_admin_origin),
 ):
     try:
         return update_prize_rule(
@@ -66,3 +90,4 @@ def update_prize_rule_endpoint(
             status_code=400,
             detail=str(exc),
         ) from exc
+
