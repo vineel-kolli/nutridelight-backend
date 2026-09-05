@@ -7,6 +7,8 @@ from app.core.database import SessionLocal
 from app.main import app
 from app.models.admin_session import AdminSession
 from app.models.admin_user import AdminUser
+from app.models.game_config import GameConfig
+from app.models.prize_rule import PrizeRule
 from app.services.auth_service import hash_password
 
 
@@ -165,9 +167,7 @@ def test_logout_revokes_session():
     db = SessionLocal()
 
     try:
-        token_hashes = db.execute(
-            select(AdminSession.token_hash)
-        ).scalars().all()
+        
 
         # There should be no active session.
         active_sessions = db.execute(
@@ -224,3 +224,320 @@ def test_invalid_session_cookie_returns_401():
     assert response.status_code == 401
 
     client.cookies.clear()
+
+
+def test_expired_session_cookie_returns_401():
+    create_test_admin()
+
+    login_response = client.post(
+        "/api/v1/admin/auth/login",
+        json={
+            "username": "testadmin",
+            "password": "TestPassword123!",
+        },
+    )
+
+    assert login_response.status_code == 200
+
+    session_token = login_response.cookies.get(
+        ADMIN_SESSION_COOKIE
+    )
+
+    assert session_token is not None
+
+    db = SessionLocal()
+
+    try:
+        session = db.execute(
+            select(AdminSession).where(
+                AdminSession.token_hash.is_not(None)
+            )
+        ).scalars().first()
+
+        assert session is not None
+
+        from datetime import UTC, datetime, timedelta
+
+        session.expires_at = datetime.now(UTC) - timedelta(
+            minutes=1
+        )
+
+        db.commit()
+
+    finally:
+        db.close()
+
+    client.cookies.set(
+        ADMIN_SESSION_COOKIE,
+        session_token,
+    )
+
+    response = client.get(
+        "/api/v1/admin/auth/me"
+    )
+
+    assert response.status_code == 401
+
+    client.cookies.clear()
+
+def login_test_admin() -> None:
+    response = client.post(
+        "/api/v1/admin/auth/login",
+        json={
+            "username": "testadmin",
+            "password": "TestPassword123!",
+        },
+    )
+
+    assert response.status_code == 200
+
+
+def test_update_game_config_requires_authentication():
+    response = client.put(
+        "/api/v1/game-config",
+        json={
+            "total_games": 5,
+        },
+    )
+
+    assert response.status_code == 401
+    assert response.json()["detail"] == "Authentication required"
+
+
+def test_update_game_config_allows_authenticated_admin():
+    create_test_admin()
+
+    login_test_admin()
+
+    response = client.put(
+        "/api/v1/game-config",
+        json={
+            "total_games": 5,
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["total_games"] == 5
+
+
+def test_create_prize_rule_requires_authentication():
+    db = SessionLocal()
+
+    try:
+        game_config = GameConfig(
+            total_games=5,
+            is_active=True,
+        )
+
+        db.add(game_config)
+        db.commit()
+        db.refresh(game_config)
+
+        game_config_id = game_config.id
+
+    finally:
+        db.close()
+
+    response = client.post(
+        f"/api/v1/game-config/{game_config_id}/prize-rules",
+        json={
+            "required_wins": 5,
+            "prize_name": "30% Discount",
+            "prize_image_url": "https://example.com/prize.png",
+            "is_active": True,
+        },
+    )
+
+    assert response.status_code == 401
+    assert response.json()["detail"] == "Authentication required"
+
+
+def test_create_prize_rule_allows_authenticated_admin():
+    create_test_admin()
+
+    db = SessionLocal()
+
+    try:
+        game_config = GameConfig(
+            total_games=5,
+            is_active=True,
+        )
+
+        db.add(game_config)
+        db.commit()
+        db.refresh(game_config)
+
+        game_config_id = game_config.id
+
+    finally:
+        db.close()
+
+    login_test_admin()
+
+    response = client.post(
+        f"/api/v1/game-config/{game_config_id}/prize-rules",
+        json={
+            "required_wins": 5,
+            "prize_name": "30% Discount",
+            "prize_image_url": "https://example.com/prize.png",
+            "is_active": True,
+        },
+    )
+
+    assert response.status_code == 201
+
+    body = response.json()
+
+    assert body["game_config_id"] == game_config_id
+    assert body["required_wins"] == 5
+    assert body["prize_name"] == "30% Discount"
+
+
+def test_update_prize_rule_requires_authentication():
+    db = SessionLocal()
+
+    try:
+        game_config = GameConfig(
+            total_games=5,
+            is_active=True,
+        )
+
+        db.add(game_config)
+        db.flush()
+
+        prize_rule = PrizeRule(
+            game_config_id=game_config.id,
+            required_wins=5,
+            prize_name="30% Discount",
+            prize_image_url="https://example.com/prize.png",
+            is_active=True,
+        )
+
+        db.add(prize_rule)
+        db.commit()
+        db.refresh(game_config)
+        db.refresh(prize_rule)
+
+        game_config_id = game_config.id
+        prize_rule_id = prize_rule.id
+
+    finally:
+        db.close()
+
+    response = client.put(
+        f"/api/v1/game-config/{game_config_id}/prize-rules/{prize_rule_id}",
+        json={
+            "required_wins": 5,
+            "prize_name": "Updated Discount",
+            "prize_image_url": "https://example.com/updated.png",
+            "is_active": True,
+        },
+    )
+
+    assert response.status_code == 401
+    assert response.json()["detail"] == "Authentication required"
+
+
+def test_update_prize_rule_allows_authenticated_admin():
+    create_test_admin()
+
+    db = SessionLocal()
+
+    try:
+        game_config = GameConfig(
+            total_games=5,
+            is_active=True,
+        )
+
+        db.add(game_config)
+        db.flush()
+
+        prize_rule = PrizeRule(
+            game_config_id=game_config.id,
+            required_wins=5,
+            prize_name="30% Discount",
+            prize_image_url="https://example.com/prize.png",
+            is_active=True,
+        )
+
+        db.add(prize_rule)
+        db.commit()
+        db.refresh(game_config)
+        db.refresh(prize_rule)
+
+        game_config_id = game_config.id
+        prize_rule_id = prize_rule.id
+
+    finally:
+        db.close()
+
+    login_test_admin()
+
+    response = client.put(
+        f"/api/v1/game-config/{game_config_id}/prize-rules/{prize_rule_id}",
+        json={
+            "required_wins": 5,
+            "prize_name": "Updated Discount",
+            "prize_image_url": "https://example.com/updated.png",
+            "is_active": True,
+        },
+    )
+
+    assert response.status_code == 200
+
+    body = response.json()
+
+    assert body["id"] == prize_rule_id
+    assert body["game_config_id"] == game_config_id
+    assert body["prize_name"] == "Updated Discount"
+
+
+def test_public_game_config_does_not_require_admin_auth():
+    db = SessionLocal()
+
+    try:
+        game_config = GameConfig(
+            total_games=5,
+            is_active=True,
+        )
+
+        db.add(game_config)
+        db.commit()
+
+    finally:
+        db.close()
+
+    response = client.get(
+        "/api/v1/game-config"
+    )
+
+    assert response.status_code == 200
+    assert response.json()["total_games"] == 5
+
+
+def test_public_match_completion_does_not_require_admin_auth():
+    db = SessionLocal()
+
+    try:
+        game_config = GameConfig(
+            total_games=5,
+            is_active=True,
+        )
+
+        db.add(game_config)
+        db.commit()
+
+    finally:
+        db.close()
+
+    response = client.post(
+        "/api/v1/match/complete",
+        json={
+            "player_wins": 3,
+            "buddy_wins": 2,
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["player_wins"] == 3
+    assert response.json()["buddy_wins"] == 2

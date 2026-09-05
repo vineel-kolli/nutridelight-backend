@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from app.api.dependencies import get_db
+from app.api.dependencies import get_db,get_current_admin
 from app.schemas.prize_rule import (
     PrizeRuleCreate,
     PrizeRuleResponse,
@@ -27,6 +27,7 @@ def create_prize_rule_endpoint(
     game_config_id: int,
     data: PrizeRuleCreate,
     db: Session = Depends(get_db),
+    admin=Depends(get_current_admin),
 ):
     try:
         return create_prize_rule(
@@ -50,6 +51,8 @@ def update_prize_rule_endpoint(
     prize_rule_id: int,
     data: PrizeRuleCreate,
     db: Session = Depends(get_db),
+    admin=Depends(get_current_admin),
+
 ):
     try:
         return update_prize_rule(

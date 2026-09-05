@@ -1,6 +1,11 @@
+from datetime import UTC, datetime, timedelta
 
+from sqlalchemy import select
+
+from app.models.admin_session import AdminSession
 
 from app.models.admin_user import AdminUser
+
 from app.services.auth_service import (
     authenticate_admin,
     create_admin_session,
@@ -165,3 +170,134 @@ def test_invalid_session_token_returns_none(db):
         db=db,
         raw_token="invalid-token",
     ) is None
+
+def test_expired_session_returns_none(db):
+    admin = AdminUser(
+        username="testadmin",
+        password_hash=hash_password("TestPassword123!"),
+        is_active=True,
+    )
+
+    db.add(admin)
+    db.flush()
+
+    raw_token = create_admin_session(
+        db=db,
+        admin_user=admin,
+    )
+
+    session = db.execute(
+        select(AdminSession).where(
+            AdminSession.admin_user_id == admin.id
+        )
+    ).scalar_one()
+
+    session.expires_at = datetime.now(UTC) - timedelta(minutes=1)
+    db.flush()
+
+    assert get_admin_by_session(
+        db=db,
+        raw_token=raw_token,
+    ) is None
+
+
+def test_inactive_admin_cannot_use_existing_session(db):
+    admin = AdminUser(
+        username="testadmin",
+        password_hash=hash_password("TestPassword123!"),
+        is_active=True,
+    )
+
+    db.add(admin)
+    db.flush()
+
+    raw_token = create_admin_session(
+        db=db,
+        admin_user=admin,
+    )
+
+    assert get_admin_by_session(
+        db=db,
+        raw_token=raw_token,
+    ) is not None
+
+    admin.is_active = False
+    db.flush()
+
+    assert get_admin_by_session(
+        db=db,
+        raw_token=raw_token,
+    ) is None
+
+
+def test_raw_session_token_is_not_stored(db):
+    admin = AdminUser(
+        username="testadmin",
+        password_hash=hash_password("TestPassword123!"),
+        is_active=True,
+    )
+
+    db.add(admin)
+    db.flush()
+
+    raw_token = create_admin_session(
+        db=db,
+        admin_user=admin,
+    )
+
+    session = db.execute(
+        select(AdminSession).where(
+            AdminSession.admin_user_id == admin.id
+        )
+    ).scalar_one()
+
+    assert session.token_hash != raw_token
+    assert len(session.token_hash) == 64
+
+
+def test_multiple_sessions_are_independent(db):
+    admin = AdminUser(
+        username="testadmin",
+        password_hash=hash_password("TestPassword123!"),
+        is_active=True,
+    )
+
+    db.add(admin)
+    db.flush()
+
+    first_token = create_admin_session(
+        db=db,
+        admin_user=admin,
+    )
+
+    second_token = create_admin_session(
+        db=db,
+        admin_user=admin,
+    )
+
+    assert first_token != second_token
+
+    assert get_admin_by_session(
+        db=db,
+        raw_token=first_token,
+    ) is not None
+
+    assert get_admin_by_session(
+        db=db,
+        raw_token=second_token,
+    ) is not None
+
+    revoke_admin_session(
+        db=db,
+        raw_token=first_token,
+    )
+
+    assert get_admin_by_session(
+        db=db,
+        raw_token=first_token,
+    ) is None
+
+    assert get_admin_by_session(
+        db=db,
+        raw_token=second_token,
+    ) is not None
