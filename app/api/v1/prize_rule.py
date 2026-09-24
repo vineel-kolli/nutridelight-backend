@@ -14,6 +14,7 @@ from app.services.prize_rule_service import (
     create_prize_rule,
     update_prize_rule,
     get_prize_rules,
+    delete_prize_rule,
 )
 
 
@@ -91,3 +92,25 @@ def update_prize_rule_endpoint(
             detail=str(exc),
         ) from exc
 
+@router.delete(
+    "/{prize_rule_id}",
+    status_code=204,
+)
+def delete_prize_rule_endpoint(
+    game_config_id: int,
+    prize_rule_id: int,
+    db: Session = Depends(get_db),
+    admin=Depends(get_current_admin),
+    _: None = Depends(require_admin_origin),
+):
+    try:
+        delete_prize_rule(
+            db,
+            game_config_id,
+            prize_rule_id,
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=400,
+            detail=str(exc),
+        ) from exc

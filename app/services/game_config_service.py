@@ -10,25 +10,27 @@ def get_active_game_config(db: Session) -> GameConfig | None:
     statement = (
         select(GameConfig)
         .where(GameConfig.is_active.is_(True))
-        .order_by(GameConfig.id.desc())
-        .limit(1)
+        .order_by(GameConfig.id.asc())
     )
 
-    return db.execute(statement).scalar_one_or_none()
+    configs = db.execute(statement).scalars().all()
+
+    if not configs:
+        return None
+
+    if len(configs) > 1:
+        raise RuntimeError(
+            "Database integrity error: multiple active game configurations exist"
+        )
+
+    return configs[0]
 
 
 def update_game_config(
     db: Session,
     data: GameConfigCreate,
 ) -> GameConfig:
-    statement = (
-        select(GameConfig)
-        .where(GameConfig.is_active.is_(True))
-        .order_by(GameConfig.id.desc())
-        .limit(1)
-    )
-
-    game_config = db.execute(statement).scalar_one_or_none()
+    game_config = get_active_game_config(db)
 
     if game_config is None:
         game_config = GameConfig(
@@ -42,9 +44,13 @@ def update_game_config(
 
         return game_config
 
-    invalid_rule_statement = select(PrizeRule).where(
-        PrizeRule.game_config_id == game_config.id,
-        PrizeRule.required_wins > data.total_games,
+    invalid_rule_statement = (
+        select(PrizeRule)
+        .where(
+            PrizeRule.game_config_id == game_config.id,
+            PrizeRule.required_wins > data.total_games,
+        )
+        .limit(1)
     )
 
     invalid_rule = db.execute(
@@ -57,7 +63,6 @@ def update_game_config(
         )
 
     game_config.total_games = data.total_games
-    game_config.is_active = True
 
     db.commit()
     db.refresh(game_config)

@@ -1,5 +1,6 @@
-from fastapi import APIRouter, Cookie, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Cookie, Depends, HTTPException,Request, Response, status
 from sqlalchemy.orm import Session
+from app.core.config import settings
 
 from app.api.dependencies import (
     ADMIN_SESSION_COOKIE,
@@ -19,6 +20,13 @@ from app.services.auth_service import (
     create_admin_session,
     revoke_admin_session,
 )
+from app.services.login_rate_limit_service import (
+    is_login_blocked,
+    record_failed_login,
+    reset_failed_logins,
+)
+
+
 
 
 router = APIRouter(
@@ -33,10 +41,22 @@ router = APIRouter(
 )
 def login(
     data: AdminLoginRequest,
+    request: Request,
     response: Response,
     db: Session = Depends(get_db),
-   
 ):
+    client_ip = request.client.host if request.client else "unknown"
+
+    if is_login_blocked(
+        db=db,
+        username=data.username,
+        ip_address=client_ip,
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many failed login attempts. Try again later.",
+        )
+
     admin = authenticate_admin(
         db=db,
         username=data.username,
@@ -44,10 +64,24 @@ def login(
     )
 
     if admin is None:
+        record_failed_login(
+            db=db,
+            username=data.username,
+            ip_address=client_ip,
+        )
+
+        db.commit()
+
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid username or password",
         )
+
+    reset_failed_logins(
+        db=db,
+        username=data.username,
+        ip_address=client_ip,
+    )
 
     session_token = create_admin_session(
         db=db,
@@ -60,7 +94,7 @@ def login(
         key=ADMIN_SESSION_COOKIE,
         value=session_token,
         httponly=True,
-        secure=False,
+        secure=settings.environment == "production",
         samesite="lax",
         max_age=8 * 60 * 60,
         path="/",
@@ -72,8 +106,6 @@ def login(
             username=admin.username,
         ),
     )
-
-
 @router.post("/logout")
 def logout(
     response: Response,

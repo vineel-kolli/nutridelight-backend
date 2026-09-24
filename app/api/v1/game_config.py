@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+
 from app.models.admin_user import AdminUser
 
 from app.api.dependencies import (
@@ -30,7 +31,13 @@ router = APIRouter(
 def get_game_config(
     db: Session = Depends(get_db),
 ):
-    game_config = get_active_game_config(db)
+    try:
+        game_config = get_active_game_config(db)
+    except RuntimeError as exc:
+        raise HTTPException(
+            status_code=500,
+            detail=str(exc),
+        ) from exc
 
     if game_config is None:
         raise HTTPException(
@@ -51,4 +58,17 @@ def update_game_config_endpoint(
     admin: AdminUser = Depends(get_current_admin),
     _: None = Depends(require_admin_origin),
 ):
-    return update_game_config(db, data)
+    try:
+        return update_game_config(db, data)
+
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=400,
+            detail=str(exc),
+        ) from exc
+
+    except RuntimeError as exc:
+        raise HTTPException(
+            status_code=500,
+            detail="Game configuration temporarily unavalible",
+        ) from exc

@@ -158,3 +158,40 @@ def get_prize_rules(
     )
 
     return list(db.execute(statement).scalars().all())
+
+
+def delete_prize_rule(
+    db: Session,
+    game_config_id: int,
+    prize_rule_id: int,
+) -> None:
+    config_statement = select(GameConfig).where(
+        GameConfig.id == game_config_id,
+        GameConfig.is_active.is_(True),
+    )
+
+    game_config = db.execute(
+        config_statement
+    ).scalar_one_or_none()
+
+    if game_config is None:
+        raise ValueError(
+            "Active game configuration not found"
+        )
+
+    prize_statement = select(PrizeRule).where(
+        PrizeRule.id == prize_rule_id,
+        PrizeRule.game_config_id == game_config_id,
+    )
+
+    prize_rule = db.execute(
+        prize_statement
+    ).scalar_one_or_none()
+
+    if prize_rule is None:
+        raise ValueError(
+            "Prize rule not found"
+        )
+
+    db.delete(prize_rule)
+    db.commit()
