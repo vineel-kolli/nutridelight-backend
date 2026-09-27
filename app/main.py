@@ -20,6 +20,8 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import Response
 
+from app.core.logging_config import configure_logging
+
 class UploadCORPMiddleware(BaseHTTPMiddleware):
     async def dispatch(
         self,
@@ -45,6 +47,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
 
         return response
+configure_logging()
 
 app = FastAPI(title=settings.app_name,version=settings.app_version,)
 UPLOAD_ROOT = Path("uploads")

@@ -11,7 +11,7 @@ from app.models.admin_user import AdminUser
 from app.models.game_config import GameConfig
 from app.models.prize_rule import PrizeRule
 from app.services.auth_service import hash_password
-
+from app.services.auth_service import hash_session_token
 
 client = TestClient(app)
 
@@ -200,13 +200,12 @@ def test_logout_revokes_session(db):
 
     assert me_response.status_code == 401
 
-    active_sessions = db.execute(
+    session = db.execute(
         select(AdminSession).where(
-            AdminSession.revoked_at.is_(None)
+            AdminSession.token_hash== hash_session_token(session_token)
         )
-    ).scalars().all()
-
-    assert len(active_sessions) == 0
+    ).scalar_one()
+    assert session.revoked_at is not None
 
 
 def test_inactive_admin_cannot_login(db):
@@ -272,9 +271,9 @@ def test_expired_session_cookie_returns_401(db):
 
     session = db.execute(
         select(AdminSession).where(
-            AdminSession.token_hash.is_not(None)
+            AdminSession.token_hash == hash_session_token(session_token)
         )
-    ).scalars().first()
+    ).scalar_one()
 
     assert session is not None
 

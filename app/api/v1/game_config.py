@@ -16,7 +16,9 @@ from app.services.game_config_service import (
     get_active_game_config,
     update_game_config,
 )
+import logging
 
+logger = logging.getLogger(__name__)
 
 router = APIRouter(
     prefix="/game-config",
@@ -34,9 +36,10 @@ def get_game_config(
     try:
         game_config = get_active_game_config(db)
     except RuntimeError as exc:
+        logger.exception("Failed to retrieve active game configuration")
         raise HTTPException(
             status_code=500,
-            detail=str(exc),
+            detail="Game configuration temporarily unavailable",
         ) from exc
 
     if game_config is None:
@@ -68,7 +71,8 @@ def update_game_config_endpoint(
         ) from exc
 
     except RuntimeError as exc:
+        logger.exception("Failed to update game configuration")
         raise HTTPException(
             status_code=500,
-            detail="Game configuration temporarily unavalible",
+            detail="Game configuration temporarily unavailable",
         ) from exc
