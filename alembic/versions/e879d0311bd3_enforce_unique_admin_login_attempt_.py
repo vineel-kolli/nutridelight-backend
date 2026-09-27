@@ -1,6 +1,6 @@
 """enforce unique admin login attempt identity
 
-Revision ID: <KEEP GENERATED REVISION>
+Revision ID: e879d0311bd3
 Revises: f5d6d4fa9a5d
 """
 
