@@ -1,10 +1,12 @@
+from typing import Literal
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
     app_name: str = "Nutri Delight API"
     app_version: str = "1.0.0"
-    environment: str = "development"
+    environment: Literal["development", "production"] = "development"
 
     database_url: str
     frontend_url: str = "http://localhost:5173"

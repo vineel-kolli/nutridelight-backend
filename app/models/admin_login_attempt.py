@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import DateTime, Integer, String
+from sqlalchemy import DateTime, Integer, String,UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
@@ -8,7 +8,13 @@ from app.core.database import Base
 
 class AdminLoginAttempt(Base):
     __tablename__ = "admin_login_attempts"
-
+    __table_args__ = (
+        UniqueConstraint(
+            "username",
+            "ip_address",
+            name="uq_admin_login_attempt_username_ip",
+        ),
+    )
     id: Mapped[int] = mapped_column(
         Integer,
         primary_key=True,
