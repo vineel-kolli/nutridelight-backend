@@ -6,9 +6,31 @@ from app.main import app
 from app.models.game_config import GameConfig
 from app.models.prize_rule import PrizeRule
 
+from app.models.admin_user import AdminUser
+from app.services.auth_service import hash_password
+from app.api.dependencies import ADMIN_SESSION_COOKIE
+
+
+
 
 client = TestClient(app)
 
+
+TEST_USERNAME = "testadmin"
+TEST_PASSWORD = "TestPassword123!"
+
+
+def create_test_admin(db: Session) -> AdminUser:
+    admin = AdminUser(
+        username=TEST_USERNAME,
+        password_hash=hash_password(TEST_PASSWORD),
+        is_active=True,
+    )
+
+    db.add(admin)
+    db.flush()
+
+    return admin
 
 def create_test_data(db: Session) -> GameConfig:
     game_config = GameConfig(
@@ -169,3 +191,26 @@ def test_complete_match_missing_field():
     )
 
     assert response.status_code == 422
+
+def test_login_sets_secure_session_cookie_attributes(db):
+    client.cookies.clear()
+
+    create_test_admin(db)
+
+    response = client.post(
+        "/api/v1/admin/auth/login",
+        json={
+            "username": TEST_USERNAME,
+            "password": TEST_PASSWORD,
+        },
+    )
+
+    assert response.status_code == 200
+
+    set_cookie = response.headers["set-cookie"]
+
+    assert f"{ADMIN_SESSION_COOKIE}=" in set_cookie
+    assert "HttpOnly" in set_cookie
+    assert "SameSite=lax" in set_cookie
+    assert "Max-Age=28800" in set_cookie
+    assert "Path=/" in set_cookie
