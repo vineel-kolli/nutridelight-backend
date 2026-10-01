@@ -1,4 +1,5 @@
-from fastapi import APIRouter, Cookie, Depends, HTTPException,Request, Response, status
+from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response, status
+from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 from app.core.config import settings
 
@@ -90,22 +91,28 @@ def login(
 
     db.commit()
 
-    response.set_cookie(
+    final_response = JSONResponse(
+        content={
+            "admin": {
+                "id": admin.id,
+                "username": admin.username,
+            }
+        }
+    )
+
+    final_response.set_cookie(
         key=ADMIN_SESSION_COOKIE,
         value=session_token,
         httponly=True,
         secure=settings.environment == "production",
-        samesite="none" ,
+        samesite="none",
         max_age=8 * 60 * 60,
         path="/",
     )
-    response.headers["X-Debug-cookie"] ="set"
-    return AdminLoginResponse(
-        admin=AdminUserResponse(
-            id=admin.id,
-            username=admin.username,
-        ),
-    )
+
+    final_response.headers["X-Debug-cookie"] = "set"
+
+    return final_response
 @router.post("/logout")
 def logout(
     response: Response,
