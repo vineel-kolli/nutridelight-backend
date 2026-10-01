@@ -99,7 +99,7 @@ def login(
         max_age=8 * 60 * 60,
         path="/",
     )
-
+    response.headers["X-Debug-cookie"] ="set"
     return AdminLoginResponse(
         admin=AdminUserResponse(
             id=admin.id,
