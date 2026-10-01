@@ -95,7 +95,7 @@ def login(
         value=session_token,
         httponly=True,
         secure=settings.environment == "production",
-        samesite="none" if settings.environment == "production" else "lax",
+        samesite="none" ,
         max_age=8 * 60 * 60,
         path="/",
     )
