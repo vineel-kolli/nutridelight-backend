@@ -1,3 +1,5 @@
+import pytest
+
 from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import select
@@ -13,6 +15,7 @@ from app.services.auth_service import (
     hash_password,
     revoke_admin_session,
     verify_password,
+    change_admin_password,
 )
 
 
@@ -301,3 +304,125 @@ def test_multiple_sessions_are_independent(db):
         db=db,
         raw_token=second_token,
     ) is not None
+
+def test_change_admin_password(db):
+    admin = AdminUser(
+        username="testadmin",
+        password_hash=hash_password(
+            "OldPassword123!"
+        ),
+        is_active=True,
+    )
+
+    db.add(admin)
+    db.flush()
+
+    change_admin_password(
+        db=db,
+        admin_user=admin,
+        current_password="OldPassword123!",
+        new_password="NewPassword456!",
+    )
+
+    db.commit()
+
+    assert verify_password(
+        "NewPassword456!",
+        admin.password_hash,
+    )
+
+    assert not verify_password(
+        "OldPassword123!",
+        admin.password_hash,
+    )
+def test_change_admin_password_rejects_wrong_current_password(
+    db,
+):
+    admin = AdminUser(
+        username="testadmin",
+        password_hash=hash_password(
+            "OldPassword123!"
+        ),
+        is_active=True,
+    )
+
+    db.add(admin)
+    db.flush()
+
+    with pytest.raises(
+        ValueError,
+        match="Current password is incorrect.",
+    ):
+        change_admin_password(
+            db=db,
+            admin_user=admin,
+            current_password="WrongPassword123!",
+            new_password="NewPassword456!",
+        )
+def test_change_admin_password_rejects_same_password(
+    db,
+):
+    admin = AdminUser(
+        username="testadmin",
+        password_hash=hash_password(
+            "OldPassword123!"
+        ),
+        is_active=True,
+    )
+
+    db.add(admin)
+    db.flush()
+
+    with pytest.raises(
+        ValueError,
+        match="New password must be different",
+    ):
+        change_admin_password(
+            db=db,
+            admin_user=admin,
+            current_password="OldPassword123!",
+            new_password="OldPassword123!",
+        )
+
+def test_change_admin_password_revokes_all_sessions(
+    db,
+):
+    admin = AdminUser(
+        username="testadmin",
+        password_hash=hash_password(
+            "OldPassword123!"
+        ),
+        is_active=True,
+    )
+
+    db.add(admin)
+    db.flush()
+
+    first_token = create_admin_session(
+        db=db,
+        admin_user=admin,
+    )
+
+    second_token = create_admin_session(
+        db=db,
+        admin_user=admin,
+    )
+
+    change_admin_password(
+        db=db,
+        admin_user=admin,
+        current_password="OldPassword123!",
+        new_password="NewPassword456!",
+    )
+
+    db.commit()
+
+    assert get_admin_by_session(
+        db=db,
+        raw_token=first_token,
+    ) is None
+
+    assert get_admin_by_session(
+        db=db,
+        raw_token=second_token,
+    ) is None

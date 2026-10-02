@@ -5,7 +5,16 @@ class AdminLoginRequest(BaseModel):
     username: str = Field(min_length=1, max_length=100)
     password: str = Field(min_length=1, max_length=200)
 
+class AdminChangePasswordRequest(BaseModel):
+    current_password: str = Field(
+        min_length=1,
+        max_length=200,
+    )
 
+    new_password: str = Field(
+        min_length=1,
+        max_length=200,
+    )
 class AdminUserResponse(BaseModel):
     id: int
     username: str

@@ -11,6 +11,7 @@ from app.api.dependencies import (
 )
 from app.models.admin_user import AdminUser
 from app.schemas.auth import (
+    AdminChangePasswordRequest,
     AdminLoginRequest,
     AdminLoginResponse,
     AdminMeResponse,
@@ -18,6 +19,7 @@ from app.schemas.auth import (
 )
 from app.services.auth_service import (
     authenticate_admin,
+    change_admin_password,
     create_admin_session,
     revoke_admin_session,
 )
@@ -138,7 +140,123 @@ def logout(
 
     return {"message": "Logged out"}
 
+@router.post("/change-password")
+def change_password(
+    data: AdminChangePasswordRequest,
+    request: Request,
+    response: Response,
+    admin_session: str | None = Cookie(
+        default=None,
+        alias=ADMIN_SESSION_COOKIE,
+    ),
+    db: Session = Depends(get_db),
+    admin: AdminUser = Depends(get_current_admin),
+    _: None = Depends(require_admin_origin),
+):
+    if not admin_session:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication required",
+        )
 
+    try:
+        change_admin_password(
+            db=db,
+            admin_user=admin,
+            current_password=data.current_password,
+            new_password=data.new_password,
+        )
+
+        new_session_token = create_admin_session(
+            db=db,
+            admin_user=admin,
+        )
+
+        db.commit()
+
+    except ValueError as exc:
+        db.rollback()
+
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
+
+    final_response = JSONResponse(
+        content={
+            "message": "Password changed successfully.",
+        }
+    )
+
+    final_response.set_cookie(
+        key=ADMIN_SESSION_COOKIE,
+        value=new_session_token,
+        httponly=True,
+        secure=True,
+        samesite="none",
+        max_age=8 * 60 * 60,
+        path="/",
+    )
+
+    return final_response
+@router.post("/change-password")
+def change_password(
+    data: AdminChangePasswordRequest,
+    response: Response,
+    admin_session: str | None = Cookie(
+        default=None,
+        alias=ADMIN_SESSION_COOKIE,
+    ),
+    db: Session = Depends(get_db),
+    admin: AdminUser = Depends(get_current_admin),
+    _: None = Depends(require_admin_origin),
+):
+    if not admin_session:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication required",
+        )
+
+    try:
+        change_admin_password(
+            db=db,
+            admin_user=admin,
+            current_password=data.current_password,
+            new_password=data.new_password,
+        )
+
+        new_session_token = create_admin_session(
+            db=db,
+            admin_user=admin,
+        )
+
+        db.commit()
+
+    except ValueError as exc:
+        db.rollback()
+
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
+
+    final_response = JSONResponse(
+        content={
+            "message": "Password changed successfully.",
+        }
+    )
+
+    final_response.set_cookie(
+        key=ADMIN_SESSION_COOKIE,
+        value=new_session_token,
+        httponly=True,
+        secure=True,
+        samesite="none",
+        max_age=8 * 60 * 60,
+        path="/",
+    )
+
+    return final_response
 @router.get(
     "/me",
     response_model=AdminMeResponse,

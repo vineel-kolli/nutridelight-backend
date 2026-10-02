@@ -130,3 +130,56 @@ def revoke_admin_session(
     db.flush()
 
     return True
+
+def revoke_all_admin_sessions(
+    db: Session,
+    admin_user_id: int,
+) -> int:
+    """Revoke all active sessions for an admin user."""
+
+    statement = select(AdminSession).where(
+        AdminSession.admin_user_id == admin_user_id,
+        AdminSession.revoked_at.is_(None),
+    )
+
+    sessions = db.execute(statement).scalars().all()
+
+    now = datetime.now(UTC)
+
+    for session in sessions:
+        session.revoked_at = now
+
+    db.flush()
+
+    return len(sessions)
+
+def change_admin_password(
+    db: Session,
+    admin_user: AdminUser,
+    current_password: str,
+    new_password: str,
+) -> None:
+    """Change an admin password after verifying the current password."""
+
+    if not verify_password(
+        current_password,
+        admin_user.password_hash,
+    ):
+        raise ValueError("Current password is incorrect.")
+
+    if verify_password(
+        new_password,
+        admin_user.password_hash,
+    ):
+        raise ValueError(
+            "New password must be different from the current password."
+        )
+
+    admin_user.password_hash = hash_password(new_password)
+
+    revoke_all_admin_sessions(
+        db=db,
+        admin_user_id=admin_user.id,
+    )
+
+    db.flush()
