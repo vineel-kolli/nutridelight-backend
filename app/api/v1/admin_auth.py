@@ -104,7 +104,7 @@ def login(
         key=ADMIN_SESSION_COOKIE,
         value=session_token,
         httponly=True,
-        secure=settings.environment == "production",
+        secure=True,
         samesite="none",
         max_age=8 * 60 * 60,
         path="/",
