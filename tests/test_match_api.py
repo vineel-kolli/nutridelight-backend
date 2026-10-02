@@ -13,7 +13,7 @@ from app.models.prize_rule import PrizeRule
 from app.services.auth_service import hash_password
 from app.services.auth_service import hash_session_token
 
-client = TestClient(app)
+client = TestClient(app,base_url="https://testserver")
 
 
 TEST_USERNAME = "testadmin"

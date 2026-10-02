@@ -5,7 +5,10 @@ from sqlalchemy.orm import Session
 from app.models.game_config import GameConfig
 from app.models.prize_rule import PrizeRule
 from app.schemas.prize_rule import PrizeRuleCreate
-
+from app.services.storage_service import (
+    delete_prize_image,
+    get_prize_image_storage_path,
+)
 
 DUPLICATE_PRIZE_RULE_MESSAGE = (
     "A prize rule already exists for this number of wins"
@@ -113,6 +116,14 @@ def update_prize_rule(
             DUPLICATE_PRIZE_RULE_MESSAGE
         )
 
+    old_image_path = get_prize_image_storage_path(
+        prize_rule.prize_image_url
+    )
+
+    new_image_path = get_prize_image_storage_path(
+        data.prize_image_url
+    )
+
     prize_rule.required_wins = data.required_wins
     prize_rule.prize_name = data.prize_name
     prize_rule.prize_image_url = data.prize_image_url
@@ -128,9 +139,20 @@ def update_prize_rule(
 
     db.refresh(prize_rule)
 
+    if (
+        old_image_path
+        and old_image_path != new_image_path
+    ):
+        try:
+            delete_prize_image(
+                path=old_image_path
+            )
+        except Exception:
+            # Database update succeeded.
+            # Storage cleanup can be retried separately.
+            pass
+
     return prize_rule
-
-
 def get_prize_rules(
     db: Session,
     game_config_id: int,
@@ -193,5 +215,19 @@ def delete_prize_rule(
             "Prize rule not found"
         )
 
+    image_path = get_prize_image_storage_path(
+    prize_rule.prize_image_url
+)
+
     db.delete(prize_rule)
     db.commit()
+
+    if image_path:
+        try:
+            delete_prize_image(
+                path=image_path
+            )
+        except Exception:
+            # Database deletion succeeded.
+            # Storage cleanup can be retried separately.
+            pass    

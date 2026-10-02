@@ -13,7 +13,7 @@ from app.api.dependencies import ADMIN_SESSION_COOKIE
 
 
 
-client = TestClient(app)
+client = TestClient(app,base_url="https://testserver",)
 
 
 TEST_USERNAME = "testadmin"
@@ -211,6 +211,7 @@ def test_login_sets_secure_session_cookie_attributes(db):
 
     assert f"{ADMIN_SESSION_COOKIE}=" in set_cookie
     assert "HttpOnly" in set_cookie
-    assert "SameSite=lax" in set_cookie
+    assert "SameSite=none" in set_cookie
+    assert "Secure" in set_cookie
     assert "Max-Age=28800" in set_cookie
     assert "Path=/" in set_cookie

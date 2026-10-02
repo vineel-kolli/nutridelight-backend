@@ -9,14 +9,30 @@ from app.models.admin_user import AdminUser
 from app.services.auth_service import hash_password
 
 
-client = TestClient(app)
+client = TestClient(app,base_url="https://testserver",)
 
 
 TEST_USERNAME = "uploadtestadmin"
 TEST_PASSWORD = "TestPassword123!"
 FRONTEND_ORIGIN = "http://localhost:5173"
 
+def mock_prize_image_upload(monkeypatch):
+    def fake_upload_prize_image(
+        *,
+        file_data: bytes,
+        path: str,
+        content_type: str,
+    ) -> str:
+        return (
+            "https://test.supabase.co/"
+            "storage/v1/object/public/"
+            f"prize-images/{path}"
+        )
 
+    monkeypatch.setattr(
+        "app.api.v1.admin_uploads.upload_prize_image",
+        fake_upload_prize_image,
+    )
 def create_test_admin(db: Session) -> AdminUser:
     admin = AdminUser(
         username=TEST_USERNAME,
@@ -132,9 +148,8 @@ def test_upload_valid_png(db):
 
     data = response.json()
 
-    assert data["url"].startswith(
-        "http://testserver/uploads/prizes/"
-    )
+    assert data["url"].startswith("https://")
+    assert "/storage/v1/object/public/prize-images/prizes/" in data["url"]
     assert data["filename"].endswith(".png")
 
 

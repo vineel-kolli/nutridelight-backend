@@ -1,8 +1,7 @@
 from io import BytesIO
-from pathlib import Path
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from PIL import Image, UnidentifiedImageError
 
 from app.api.dependencies import (
@@ -10,6 +9,7 @@ from app.api.dependencies import (
     require_admin_origin,
 )
 from app.models.admin_user import AdminUser
+from app.services.storage_service import upload_prize_image
 
 
 router = APIRouter(
@@ -17,9 +17,6 @@ router = APIRouter(
     tags=["Admin Uploads"],
 )
 
-
-UPLOAD_ROOT = Path("uploads")
-PRIZE_UPLOAD_DIR = UPLOAD_ROOT / "prizes"
 
 MAX_IMAGE_SIZE = 5 * 1024 * 1024
 
@@ -31,15 +28,11 @@ ALLOWED_IMAGE_TYPES = {
 
 
 @router.post("/prize-image")
-async def upload_prize_image(
-    request: Request,
+async def upload_prize_image_endpoint(
     file: UploadFile = File(...),
     _: AdminUser = Depends(get_current_admin),
     __: None = Depends(require_admin_origin),
-    
 ):
-    
-
     if not file.filename:
         raise HTTPException(
             status_code=400,
@@ -84,30 +77,22 @@ async def upload_prize_image(
             detail="Uploaded file is not a valid image",
         ) from exc
 
-    PRIZE_UPLOAD_DIR.mkdir(
-        parents=True,
-        exist_ok=True,
-    )
-
     generated_filename = (
         f"{uuid4().hex}{extension}"
     )
 
-    destination = (
-        PRIZE_UPLOAD_DIR / generated_filename
+    storage_path = (
+        f"prizes/{generated_filename}"
     )
 
-    destination.write_bytes(file_data)
-
-    relative_url = (
-        f"/uploads/prizes/{generated_filename}"
+    image_url = upload_prize_image(
+        file_data=file_data,
+        path=storage_path,
+        content_type=file.content_type
+        or "application/octet-stream",
     )
-
-    base_url = str(
-        request.base_url
-    ).rstrip("/")
 
     return {
-        "url": f"{base_url}{relative_url}",
+        "url": image_url,
         "filename": generated_filename,
     }

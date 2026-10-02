@@ -110,7 +110,7 @@ def login(
         path="/",
     )
 
-    final_response.headers["X-Debug-cookie"] = "set"
+    
 
     return final_response
 @router.post("/logout")
